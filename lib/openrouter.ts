@@ -1,0 +1,78 @@
+import { LEGAL_SYSTEM_PROMPT } from '@/lib/prompts';
+
+interface OpenRouterMessage {
+  role: 'system' | 'user' | 'assistant';
+  content: string;
+}
+
+interface OpenRouterResponseBody {
+  choices: Array<{
+    message: {
+      content: string;
+    };
+  }>;
+}
+
+export interface LLMResult {
+  answer: string;
+  sources: string[];
+}
+
+export async function callOpenRouter(
+  query: string,
+  history: Array<{ role: string; content: string }>
+): Promise<LLMResult> {
+  const apiKey = process.env.OPENROUTER_API_KEY;
+  if (!apiKey) {
+    throw new Error('OPENROUTER_API_KEY no está configurada');
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 25_000);
+
+  const messages: OpenRouterMessage[] = [
+    { role: 'system', content: LEGAL_SYSTEM_PROMPT },
+    ...history.map((m) => ({
+      role: m.role as 'user' | 'assistant',
+      content: m.content,
+    })),
+    { role: 'user', content: query },
+  ];
+
+  try {
+    const response = await fetch(
+      'https://openrouter.ai/api/v1/chat/completions',
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${apiKey}`,
+          'HTTP-Referer': 'https://genera.legal',
+          'X-Title': 'GENERA Legal Intelligence',
+        },
+        body: JSON.stringify({
+          model: 'deepseek/deepseek-r1:free',
+          messages,
+          temperature: 0.1,
+          max_tokens: 4000,
+        }),
+        signal: controller.signal,
+      }
+    );
+
+    if (!response.ok) {
+      const errorBody = await response.text();
+      throw new Error(
+        `OpenRouter API error ${response.status}: ${errorBody}`
+      );
+    }
+
+    const data = (await response.json()) as OpenRouterResponseBody;
+
+    const answer = data.choices[0]?.message?.content ?? '';
+
+    return { answer, sources: [] };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}

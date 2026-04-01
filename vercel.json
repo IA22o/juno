@@ -1,0 +1,11 @@
+{
+  "functions": {
+    "app/api/**": {
+      "maxDuration": 30
+    }
+  },
+  "regions": ["iad1"],
+  "framework": "nextjs",
+  "trailingSlash": false,
+  "cleanUrls": true
+}
