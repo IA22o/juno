@@ -2,6 +2,7 @@
 
 import ReactMarkdown from 'react-markdown';
 import { useEffect, useMemo, useRef, memo } from 'react';
+import CitationBadge from './CitationBadge';
 
 /* ---------------------------------------------------------------
    Types
@@ -130,7 +131,15 @@ const AssistantMessage = memo(function AssistantMessage({ message }: { message: 
         >
           {/* Markdown content */}
           <div className="legal-result">
-            <ReactMarkdown>{message.content}</ReactMarkdown>
+            <ReactMarkdown
+              components={{
+                a: ({ href, children }) => (
+                  <CitationBadge href={href ?? ''}>{children}</CitationBadge>
+                ),
+              }}
+            >
+              {message.content}
+            </ReactMarkdown>
           </div>
 
           {/* Source pills */}

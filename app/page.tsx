@@ -8,6 +8,8 @@ import MessageList, { type Message } from '@/components/MessageList';
 import LoadingSkeleton from '@/components/LoadingSkeleton';
 import SearchInput from '@/components/SearchInput';
 import Footer from '@/components/Footer';
+import ResearchPanel from '@/components/ResearchPanel';
+import SessionEnded from '@/components/SessionEnded';
 
 /* ---------------------------------------------------------------
    Types for API communication
@@ -145,8 +147,46 @@ export default function Page() {
   const [apiHistory, setApiHistory] = useState<HistoryEntry[]>([]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [queryHistory, setQueryHistory] = useState<string[]>([]);
+  const [lastSources, setLastSources] = useState<string[]>([]);
+  const [lastQuery, setLastQuery] = useState('');
+  const [searchCount, setSearchCount] = useState(0);
+  const SESSION_LIMIT = 3;
   const abortControllerRef = useRef<AbortController | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  // Restore session from localStorage on mount
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('juno_session');
+      if (saved) {
+        const s = JSON.parse(saved);
+        if (s.messages) {
+          setMessages(
+            s.messages.map((m: Message) => ({ ...m, timestamp: new Date(m.timestamp) }))
+          );
+        }
+        if (s.apiHistory) setApiHistory(s.apiHistory);
+        if (s.queryHistory) setQueryHistory(s.queryHistory);
+        if (s.lastSources) setLastSources(s.lastSources);
+        if (s.lastQuery) setLastQuery(s.lastQuery);
+        if (typeof s.searchCount === 'number') setSearchCount(s.searchCount);
+      }
+    } catch {
+      // corrupted storage — ignore
+    }
+  }, []);
+
+  // Persist session to localStorage whenever relevant state changes
+  useEffect(() => {
+    try {
+      localStorage.setItem(
+        'juno_session',
+        JSON.stringify({ messages, apiHistory, queryHistory, lastSources, lastQuery, searchCount })
+      );
+    } catch {
+      // storage full or unavailable — ignore
+    }
+  }, [messages, apiHistory, queryHistory, lastSources, lastQuery, searchCount]);
 
   // Auto-scroll when messages change
   useEffect(() => {
@@ -155,7 +195,7 @@ export default function Page() {
 
   const handleSubmit = useCallback(
     async (text: string) => {
-      if (!text.trim() || isLoading) return;
+      if (!text.trim() || isLoading || searchCount >= SESSION_LIMIT) return;
 
       const trimmedText = text.trim();
       setError(null);
@@ -170,6 +210,8 @@ export default function Page() {
 
       setMessages((prev) => [...prev, userMessage]);
       setQueryHistory((prev) => [trimmedText, ...prev]);
+      setSearchCount((prev) => prev + 1);
+      setLastQuery(trimmedText);
       setQuery('');
       setIsLoading(true);
 
@@ -207,6 +249,7 @@ export default function Page() {
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
+        setLastSources(data.sources ?? []);
 
         // 4. Update apiHistory with both turns
         setApiHistory(data.updatedHistory);
@@ -335,87 +378,104 @@ export default function Page() {
         )}
       </header>
 
-      {/* Main content area */}
-      <div className="flex flex-col flex-1 overflow-hidden">
-        {/* Hero or message list */}
-        {!hasMessages && !isLoading ? (
-          <div className="flex flex-col flex-1 overflow-y-auto">
-            <Hero onSelectSuggestion={handleSelectSuggestion} />
-          </div>
-        ) : (
-          <MessageList messages={messages} />
-        )}
+      {/* Main content area — two columns when active */}
+      <div className="flex flex-1 overflow-hidden">
 
-        {/* Loading skeleton — shown below last message while waiting */}
-        {isLoading && (
-          <div className="px-4 pb-2">
-            <div className="max-w-3xl mx-auto">
-              <LoadingSkeleton />
+        {/* ── Left column: chat ─────────────────────────────────── */}
+        <div className="flex flex-col flex-1 overflow-hidden min-w-0">
+          {/* Hero or message list */}
+          {!hasMessages && !isLoading ? (
+            <div className="flex flex-col flex-1 overflow-y-auto">
+              <Hero onSelectSuggestion={handleSelectSuggestion} />
             </div>
-          </div>
-        )}
+          ) : (
+            <MessageList messages={messages} />
+          )}
 
-        {/* Error message */}
-        {error && (
-          <div className="px-4 pb-2 fade-in">
-            <div
-              className="max-w-3xl mx-auto rounded-lg px-4 py-3 flex items-start gap-3"
-              role="alert"
-              style={{
-                backgroundColor: 'rgba(239, 68, 68, 0.1)',
-                border: '1px solid rgba(239, 68, 68, 0.3)',
-              }}
-            >
-              <ChevronRight
-                size={16}
-                className="shrink-0 mt-0.5"
-                style={{ color: '#ef4444' }}
-                aria-hidden="true"
-              />
-              <div className="flex-1">
-                <p
-                  className="text-sm"
-                  style={{ color: '#fca5a5', fontFamily: 'var(--font-body)' }}
-                >
-                  {error}
-                </p>
-                <button
-                  type="button"
-                  onClick={() => setError(null)}
-                  className="text-xs mt-1 underline transition-colors"
-                  style={{ color: 'var(--text-secondary)' }}
-                  onMouseEnter={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.color = 'var(--gold)';
-                  }}
-                  onMouseLeave={(e) => {
-                    (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
-                  }}
-                >
-                  Descartar
-                </button>
+          {/* Loading skeleton */}
+          {isLoading && (
+            <div className="px-4 pb-2">
+              <div className="max-w-3xl mx-auto">
+                <LoadingSkeleton />
               </div>
             </div>
+          )}
+
+          {/* Error message */}
+          {error && (
+            <div className="px-4 pb-2 fade-in">
+              <div
+                className="max-w-3xl mx-auto rounded-lg px-4 py-3 flex items-start gap-3"
+                role="alert"
+                style={{
+                  backgroundColor: 'rgba(239, 68, 68, 0.1)',
+                  border: '1px solid rgba(239, 68, 68, 0.3)',
+                }}
+              >
+                <ChevronRight
+                  size={16}
+                  className="shrink-0 mt-0.5"
+                  style={{ color: '#ef4444' }}
+                  aria-hidden="true"
+                />
+                <div className="flex-1">
+                  <p
+                    className="text-sm"
+                    style={{ color: '#fca5a5', fontFamily: 'var(--font-body)' }}
+                  >
+                    {error}
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => setError(null)}
+                    className="text-xs mt-1 underline transition-colors"
+                    style={{ color: 'var(--text-secondary)' }}
+                    onMouseEnter={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.color = 'var(--gold)';
+                    }}
+                    onMouseLeave={(e) => {
+                      (e.currentTarget as HTMLButtonElement).style.color = 'var(--text-secondary)';
+                    }}
+                  >
+                    Descartar
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
+
+          {/* Scroll anchor */}
+          <div ref={messagesEndRef} aria-hidden="true" />
+
+          {/* Search input / session ended */}
+          <div
+            className="shrink-0"
+            style={{
+              borderTop: hasMessages || isLoading ? '1px solid var(--border)' : 'none',
+              backgroundColor: 'var(--navy)',
+            }}
+          >
+            {searchCount >= SESSION_LIMIT ? (
+              <SessionEnded />
+            ) : (
+              <SearchInput
+                onSubmit={handleSubmit}
+                isLoading={isLoading}
+                value={query}
+                onChange={setQuery}
+              />
+            )}
           </div>
-        )}
-
-        {/* Scroll anchor */}
-        <div ref={messagesEndRef} aria-hidden="true" />
-
-        {/* Search input — always at bottom */}
-        <div
-          className="shrink-0"
-          style={{
-            borderTop: hasMessages || isLoading ? '1px solid var(--border)' : 'none',
-            backgroundColor: 'var(--navy)',
-          }}
-        >
-          <SearchInput
-            onSubmit={handleSubmit}
-            isLoading={isLoading}
-            value={query}
-            onChange={setQuery}
-          />
         </div>
+
+        {/* ── Right column: research panel ──────────────────────── */}
+        {(hasMessages || isLoading) && (
+          <ResearchPanel
+            isLoading={isLoading}
+            sources={lastSources}
+            query={lastQuery}
+          />
+        )}
       </div>
 
       {/* Footer */}

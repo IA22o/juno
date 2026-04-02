@@ -4,6 +4,28 @@
 // replace with an Edge-compatible KV store (e.g. Vercel KV / Upstash Redis).
 import { NextRequest, NextResponse } from 'next/server';
 
+/* ------------------------------------------------------------------ */
+/*  Auth                                                                */
+/* ------------------------------------------------------------------ */
+
+const PUBLIC_PATHS = ['/login', '/api/auth'];
+
+function handleAuth(request: NextRequest): NextResponse | null {
+  const { pathname } = request.nextUrl;
+  if (
+    PUBLIC_PATHS.some((p) => pathname.startsWith(p)) ||
+    pathname.startsWith('/_next') ||
+    pathname.startsWith('/favicon')
+  ) {
+    return null; // allow
+  }
+  const access = request.cookies.get('juno_access')?.value;
+  if (access === 'granted') return null; // allow
+  const loginUrl = request.nextUrl.clone();
+  loginUrl.pathname = '/login';
+  return NextResponse.redirect(loginUrl);
+}
+
 interface RateLimitEntry {
   count: number;
   resetAt: number;
@@ -36,7 +58,11 @@ function getClientIp(request: NextRequest): string {
 }
 
 export function proxy(request: NextRequest): NextResponse {
-  // Solo aplicar a /api/search
+  // Auth check for all routes
+  const authResponse = handleAuth(request);
+  if (authResponse) return authResponse;
+
+  // Solo aplicar rate limit a /api/search
   if (!request.nextUrl.pathname.startsWith('/api/search')) {
     return NextResponse.next();
   }
@@ -84,5 +110,5 @@ export function proxy(request: NextRequest): NextResponse {
 }
 
 export const config = {
-  matcher: ['/api/search'],
+  matcher: ['/((?!_next/static|_next/image|favicon.ico).*)'],
 };
