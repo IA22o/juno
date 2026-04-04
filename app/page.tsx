@@ -246,6 +246,7 @@ export default function Page() {
           role: 'assistant',
           content: data.answer,
           timestamp: new Date(),
+          sources: data.sources ?? [],
         };
 
         setMessages((prev) => [...prev, assistantMessage]);
@@ -386,7 +387,17 @@ export default function Page() {
           {/* Hero or message list */}
           {!hasMessages && !isLoading ? (
             <div className="flex flex-col flex-1 overflow-y-auto">
-              <Hero onSelectSuggestion={handleSelectSuggestion} />
+              <Hero
+                onSelectSuggestion={handleSelectSuggestion}
+                searchSlot={
+                  <SearchInput
+                    onSubmit={handleSubmit}
+                    isLoading={isLoading}
+                    value={query}
+                    onChange={setQuery}
+                  />
+                }
+              />
             </div>
           ) : (
             <MessageList messages={messages} />
@@ -447,25 +458,27 @@ export default function Page() {
           {/* Scroll anchor */}
           <div ref={messagesEndRef} aria-hidden="true" />
 
-          {/* Search input / session ended */}
-          <div
-            className="shrink-0"
-            style={{
-              borderTop: hasMessages || isLoading ? '1px solid var(--border)' : 'none',
-              backgroundColor: 'var(--navy)',
-            }}
-          >
-            {searchCount >= SESSION_LIMIT ? (
-              <SessionEnded />
-            ) : (
-              <SearchInput
-                onSubmit={handleSubmit}
-                isLoading={isLoading}
-                value={query}
-                onChange={setQuery}
-              />
-            )}
-          </div>
+          {/* Search input / session ended — only shown at bottom once chat is active */}
+          {(hasMessages || isLoading) && (
+            <div
+              className="shrink-0"
+              style={{
+                borderTop: '1px solid var(--border)',
+                backgroundColor: 'var(--navy)',
+              }}
+            >
+              {searchCount >= SESSION_LIMIT ? (
+                <SessionEnded />
+              ) : (
+                <SearchInput
+                  onSubmit={handleSubmit}
+                  isLoading={isLoading}
+                  value={query}
+                  onChange={setQuery}
+                />
+              )}
+            </div>
+          )}
         </div>
 
         {/* ── Right column: research panel ──────────────────────── */}

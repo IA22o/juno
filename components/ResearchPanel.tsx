@@ -62,25 +62,30 @@ interface ResearchPanelProps {
 /* ================================================================== */
 
 export default function ResearchPanel({ isLoading, sources, query }: ResearchPanelProps) {
-  const [activeTab,    setActiveTab]    = useState<'sources' | 'news'>('sources');
-  const [browseIndex,  setBrowseIndex]  = useState(0);
-  const [displayedUrl, setDisplayedUrl] = useState('');
-  const [news,         setNews]         = useState<NewsItem[]>([]);
-  const [newsLoading,  setNewsLoading]  = useState(false);
+  const [activeTab,       setActiveTab]       = useState<'sources' | 'news'>('sources');
+  const [browseIndex,     setBrowseIndex]     = useState(0);
+  const [displayedUrl,    setDisplayedUrl]    = useState('');
+  const [revealedSources, setRevealedSources] = useState<typeof BROWSE_SEQUENCE>([]);
+  const [news,            setNews]            = useState<NewsItem[]>([]);
+  const [newsLoading,     setNewsLoading]     = useState(false);
 
   const lastQueryRef   = useRef<string>('');
   const browseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const typeTimerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
+  const revealTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   /* ---- browsing animation ---------------------------------------- */
   useEffect(() => {
     if (!isLoading) {
       if (browseTimerRef.current) clearInterval(browseTimerRef.current);
       if (typeTimerRef.current)   clearInterval(typeTimerRef.current);
+      if (revealTimerRef.current) clearInterval(revealTimerRef.current);
       return;
     }
+
     let current = 0;
     setBrowseIndex(0);
+    setRevealedSources([BROWSE_SEQUENCE[0]!]);
 
     const animateUrl = (idx: number) => {
       const target = BROWSE_SEQUENCE[idx % BROWSE_SEQUENCE.length]?.url ?? '';
@@ -97,13 +102,26 @@ export default function ResearchPanel({ isLoading, sources, query }: ResearchPan
     animateUrl(0);
     browseTimerRef.current = setInterval(() => {
       current++;
-      setBrowseIndex(current % BROWSE_SEQUENCE.length);
+      const idx = current % BROWSE_SEQUENCE.length;
+      setBrowseIndex(idx);
       animateUrl(current);
     }, 2500);
+
+    // Reveal one source card at a time in real-time
+    let revealCount = 1;
+    revealTimerRef.current = setInterval(() => {
+      revealCount++;
+      if (revealCount <= BROWSE_SEQUENCE.length) {
+        setRevealedSources(BROWSE_SEQUENCE.slice(0, revealCount));
+      } else {
+        if (revealTimerRef.current) clearInterval(revealTimerRef.current);
+      }
+    }, 1400);
 
     return () => {
       if (browseTimerRef.current) clearInterval(browseTimerRef.current);
       if (typeTimerRef.current)   clearInterval(typeTimerRef.current);
+      if (revealTimerRef.current) clearInterval(revealTimerRef.current);
     };
   }, [isLoading]);
 
@@ -129,8 +147,6 @@ export default function ResearchPanel({ isLoading, sources, query }: ResearchPan
   useEffect(() => {
     if (sources.length > 0 && !isLoading) setActiveTab('sources');
   }, [sources, isLoading]);
-
-  const currentSource = BROWSE_SEQUENCE[browseIndex] ?? BROWSE_SEQUENCE[0]!;
 
   /* ---------------------------------------------------------------- */
   return (
@@ -239,28 +255,31 @@ export default function ResearchPanel({ isLoading, sources, query }: ResearchPan
       {/* ── Content ──────────────────────────────────────────────── */}
       <div className="flex-1 overflow-y-auto px-4 py-5">
 
-        {/* Loading state */}
+        {/* Loading state — real-time source discovery */}
         {isLoading && (
-          <div className="flex flex-col gap-4">
-            {/* Active source indicator — same card style as assistant message */}
-            <div
-              className="rounded-xl px-4 py-4 fade-in"
-              style={{ backgroundColor: 'var(--navy-light)', border: '1px solid rgba(74,171,120,0.15)' }}
-            >
-              <div className="flex items-center gap-2 mb-2">
-                <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--gold)' }} />
-                <span
-                  style={{ color: 'var(--gold)', fontFamily: 'var(--font-display)', fontSize: '0.875rem', fontWeight: 500 }}
-                >
-                  {currentSource.name}
-                </span>
-              </div>
-              <p style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-body)', fontSize: '0.8125rem' }}>
-                {currentSource.label}
-              </p>
+          <div className="flex flex-col gap-3">
+            {/* Status header */}
+            <div className="flex items-center gap-2 px-1 mb-1">
+              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--gold)' }} />
+              <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.5625rem', letterSpacing: '0.06em' }}>
+                CONSULTANDO FUENTES…
+              </span>
             </div>
 
-            {[1, 2, 3].map((i) => <SkeletonCard key={i} delay={i * 120} />)}
+            {/* Revealed source cards — appear one by one */}
+            {revealedSources.map((src, i) => (
+              <DiscoveringCard
+                key={src.name}
+                src={src}
+                isActive={i === browseIndex % revealedSources.length}
+                delay={0}
+              />
+            ))}
+
+            {/* Remaining skeleton cards for unrevealed sources */}
+            {BROWSE_SEQUENCE.slice(revealedSources.length, revealedSources.length + 2).map((_, i) => (
+              <SkeletonCard key={`sk-${i}`} delay={i * 80} />
+            ))}
           </div>
         )}
 
@@ -303,6 +322,79 @@ function EmptyState({ icon, text }: { icon: React.ReactNode; text: string }) {
       <p style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-body)', fontSize: '0.8125rem', maxWidth: 240, lineHeight: 1.6 }}>
         {text}
       </p>
+    </div>
+  );
+}
+
+/* Discovering card — shown during loading as each source is "found" */
+function DiscoveringCard({
+  src,
+  isActive,
+  delay,
+}: {
+  src: typeof BROWSE_SEQUENCE[number];
+  isActive: boolean;
+  delay: number;
+}) {
+  return (
+    <div
+      className="rounded-xl px-4 py-3.5 fade-in flex flex-col gap-1.5 transition-all duration-500"
+      style={{
+        backgroundColor: isActive ? 'rgba(74,171,120,0.07)' : 'var(--navy-light)',
+        border: `1px solid ${isActive ? 'rgba(74,171,120,0.3)' : 'rgba(74,171,120,0.1)'}`,
+        animationDelay: `${delay}ms`,
+      }}
+    >
+      <div className="flex items-center gap-2">
+        <div
+          className="w-1.5 h-1.5 rounded-full shrink-0 transition-all duration-300"
+          style={{ backgroundColor: isActive ? 'var(--gold)' : 'rgba(74,171,120,0.35)' }}
+        />
+        <span
+          style={{
+            fontFamily: 'var(--font-display)',
+            fontSize: '0.9375rem',
+            fontWeight: 500,
+            color: isActive ? 'var(--gold)' : 'var(--text-secondary)',
+            transition: 'color 0.3s',
+          }}
+        >
+          {src.name}
+        </span>
+        {isActive && (
+          <span
+            className="ml-auto px-1.5 py-0.5 rounded"
+            style={{
+              fontFamily: 'var(--font-mono)',
+              fontSize: '0.4375rem',
+              letterSpacing: '0.06em',
+              backgroundColor: 'rgba(74,171,120,0.12)',
+              color: 'var(--gold)',
+            }}
+          >
+            BUSCANDO
+          </span>
+        )}
+      </div>
+      <p
+        style={{
+          fontFamily: 'var(--font-body)',
+          fontSize: '0.75rem',
+          color: 'var(--text-secondary)',
+          opacity: isActive ? 0.9 : 0.5,
+          transition: 'opacity 0.3s',
+        }}
+      >
+        {src.label}
+      </p>
+      <div
+        className="mt-0.5"
+        style={{ borderTop: '1px solid var(--border)', opacity: 0.5 }}
+      />
+      <div
+        className="shimmer-base h-1.5 rounded mt-0.5"
+        style={{ width: isActive ? '70%' : '45%', transition: 'width 0.4s' }}
+      />
     </div>
   );
 }

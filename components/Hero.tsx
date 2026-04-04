@@ -2,6 +2,7 @@
 
 interface HeroProps {
   onSelectSuggestion: (text: string) => void;
+  searchSlot?: React.ReactNode;
 }
 
 const SUGGESTIONS = [
@@ -49,15 +50,15 @@ function ScaleIcon() {
   );
 }
 
-export default function Hero({ onSelectSuggestion }: HeroProps) {
+export default function Hero({ onSelectSuggestion, searchSlot }: HeroProps) {
   return (
     <section
-      className="flex flex-col items-center justify-center flex-1 px-6 py-12 sm:py-16 slide-up"
+      className="flex flex-col items-center flex-1 px-6 pt-12 pb-10 sm:pt-16 slide-up"
       aria-label="Pantalla de inicio"
     >
       {/* Logo mark */}
       <div
-        className="flex items-center justify-center w-20 h-20 rounded-full mb-6"
+        className="flex items-center justify-center w-16 h-16 rounded-full mb-5"
         style={{
           border: '1px solid rgba(74, 171, 120, 0.3)',
           backgroundColor: 'rgba(74, 171, 120, 0.06)',
@@ -69,10 +70,10 @@ export default function Hero({ onSelectSuggestion }: HeroProps) {
 
       {/* Title */}
       <h1
-        className="text-center mb-3 leading-tight"
+        className="text-center mb-2 leading-tight"
         style={{
           fontFamily: 'var(--font-display)',
-          fontSize: 'clamp(1.8rem, 5vw, 2.75rem)',
+          fontSize: 'clamp(1.6rem, 4vw, 2.5rem)',
           fontWeight: 600,
           color: 'var(--text-primary)',
           letterSpacing: '0.01em',
@@ -95,8 +96,15 @@ export default function Hero({ onSelectSuggestion }: HeroProps) {
         BOE, CENDOJ, DGT, EUR-Lex y boletines autonómicos — centralizados en un único portal jurídico
       </p>
 
+      {/* Search slot — injected from page */}
+      {searchSlot && (
+        <div className="w-full max-w-2xl mb-8">
+          {searchSlot}
+        </div>
+      )}
+
       {/* Source pills */}
-      <div className="flex flex-wrap justify-center gap-2 mb-10" role="list" aria-label="Fuentes jurídicas consultadas">
+      <div className="flex flex-wrap justify-center gap-2 mb-8" role="list" aria-label="Fuentes jurídicas consultadas">
         {[
           { label: 'BOE',                color: '#7fa8c8' },
           { label: 'CENDOJ',             color: '#9496bb' },
