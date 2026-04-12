@@ -88,7 +88,7 @@ export default function RootLayout({
       className={`${cormorant.variable} ${sourceSerif.variable} ${ibmPlexMono.variable}`}
       suppressHydrationWarning
     >
-      <body>
+      <body suppressHydrationWarning>
         {children}
       </body>
     </html>

@@ -70,11 +70,36 @@ export default function ResearchPanel({ isLoading, sources, query, isOpen, onTog
   const [revealedSources, setRevealedSources] = useState<typeof BROWSE_SEQUENCE>([]);
   const [news,            setNews]            = useState<NewsItem[]>([]);
   const [newsLoading,     setNewsLoading]     = useState(false);
+  const [loadProgress,    setLoadProgress]    = useState(0);
 
-  const lastQueryRef   = useRef<string>('');
-  const browseTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
-  const typeTimerRef   = useRef<ReturnType<typeof setInterval> | null>(null);
-  const revealTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const lastQueryRef    = useRef<string>('');
+  const browseTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const typeTimerRef    = useRef<ReturnType<typeof setInterval> | null>(null);
+  const revealTimerRef  = useRef<ReturnType<typeof setInterval> | null>(null);
+  const progressTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  /* ---- progress bar animation ------------------------------------ */
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadProgress(0);
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+      return;
+    }
+    setLoadProgress(0);
+    // Increment to ~95% over ~15s (200ms interval → 75 steps × 1.267% ≈ 95%)
+    progressTimerRef.current = setInterval(() => {
+      setLoadProgress((prev) => {
+        if (prev >= 95) {
+          if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+          return 95;
+        }
+        return prev + 95 / 75;
+      });
+    }, 200);
+    return () => {
+      if (progressTimerRef.current) clearInterval(progressTimerRef.current);
+    };
+  }, [isLoading]);
 
   /* ---- browsing animation ---------------------------------------- */
   useEffect(() => {
@@ -172,15 +197,21 @@ export default function ResearchPanel({ isLoading, sources, query, isOpen, onTog
           right: isOpen ? 380 : 0,
           top: '50%',
           transform: 'translateY(-50%)',
-          width: 28,
+          width: 32,
           paddingTop: 14,
           paddingBottom: 14,
-          backgroundColor: 'var(--navy-light)',
+          background: 'linear-gradient(180deg, var(--navy-light) 0%, rgba(13,21,38,0.95) 100%)',
           border: '1px solid var(--border)',
-          borderRight: isOpen ? '1px solid var(--border)' : 'none',
-          borderRadius: isOpen ? '6px 0 0 6px' : '6px 0 0 6px',
+          borderRight: isOpen ? '1px solid var(--border)' : '1px solid var(--border)',
+          borderRadius: '6px 0 0 6px',
           color: 'var(--gold)',
           cursor: 'pointer',
+        }}
+        onMouseEnter={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.backgroundColor = 'rgba(74,171,120,0.12)';
+        }}
+        onMouseLeave={(e) => {
+          (e.currentTarget as HTMLButtonElement).style.backgroundColor = '';
         }}
       >
         <Scale size={12} style={{ color: 'var(--gold)' }} />
@@ -225,6 +256,21 @@ export default function ResearchPanel({ isLoading, sources, query, isOpen, onTog
         transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
       }}
     >
+      {/* ── Progress bar ─────────────────────────────────────────── */}
+      {isLoading && (
+        <div className="shrink-0 w-full" style={{ height: 3, backgroundColor: 'rgba(74,171,120,0.1)' }}>
+          <div
+            style={{
+              height: '100%',
+              width: `${loadProgress}%`,
+              background: 'linear-gradient(90deg, var(--gold) 0%, rgba(74,171,120,0.8) 100%)',
+              transition: 'width 0.2s linear',
+              boxShadow: '0 0 8px rgba(74,171,120,0.5)',
+            }}
+          />
+        </div>
+      )}
+
       {/* ── Browser chrome ───────────────────────────────────────── */}
       <div
         className="shrink-0 px-4 pt-3 pb-2"
@@ -330,9 +376,24 @@ export default function ResearchPanel({ isLoading, sources, query, isOpen, onTog
         {isLoading && (
           <div className="flex flex-col gap-3">
             {/* Status header */}
-            <div className="flex items-center gap-2 px-1 mb-1">
-              <div className="w-1.5 h-1.5 rounded-full animate-pulse" style={{ backgroundColor: 'var(--gold)' }} />
-              <span style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)', fontSize: '0.5625rem', letterSpacing: '0.06em' }}>
+            <div className="flex items-center gap-2.5 px-1 mb-2">
+              {/* Radar pulse indicator */}
+              <span className="relative flex shrink-0" style={{ width: 14, height: 14 }}>
+                <span
+                  className="absolute inline-flex rounded-full"
+                  style={{
+                    width: 14,
+                    height: 14,
+                    backgroundColor: 'rgba(74,171,120,0.25)',
+                    animation: 'radar-ping 1.4s cubic-bezier(0,0,0.2,1) infinite',
+                  }}
+                />
+                <span
+                  className="relative inline-flex rounded-full"
+                  style={{ width: 8, height: 8, margin: 3, backgroundColor: 'var(--gold)' }}
+                />
+              </span>
+              <span style={{ color: 'var(--text-primary)', fontFamily: 'var(--font-mono)', fontSize: '0.6875rem', letterSpacing: '0.08em', fontWeight: 600 }}>
                 CONSULTANDO FUENTES…
               </span>
             </div>
@@ -414,6 +475,8 @@ function DiscoveringCard({
       style={{
         backgroundColor: isActive ? 'rgba(74,171,120,0.07)' : 'var(--navy-light)',
         border: `1px solid ${isActive ? 'rgba(74,171,120,0.3)' : 'rgba(74,171,120,0.1)'}`,
+        borderLeft: isActive ? '3px solid var(--gold)' : '1px solid rgba(74,171,120,0.1)',
+        boxShadow: isActive ? '0 0 12px rgba(74,171,120,0.2)' : 'none',
         animationDelay: `${delay}ms`,
       }}
     >
@@ -492,11 +555,34 @@ function SkeletonCard({ delay }: { delay: number }) {
   );
 }
 
+function useTypewriter(text: string, charDelay = 25, startDelay = 0): string {
+  const [displayed, setDisplayed] = useState('');
+  useEffect(() => {
+    setDisplayed('');
+    let ci = 0;
+    let timer: ReturnType<typeof setInterval> | null = null;
+    const start = setTimeout(() => {
+      timer = setInterval(() => {
+        ci++;
+        setDisplayed(text.slice(0, ci));
+        if (ci >= text.length && timer) clearInterval(timer);
+      }, charDelay);
+    }, startDelay);
+    return () => {
+      clearTimeout(start);
+      if (timer) clearInterval(timer);
+    };
+  }, [text, charDelay, startDelay]);
+  return displayed;
+}
+
 function SourceCard({ url }: { url: string }) {
-  const domain = parseDomain(url);
-  const name   = domainToSourceName(domain);
-  const pill   = SOURCE_PILL[name] ?? { color: 'var(--gold)', bg: 'rgba(74,171,120,0.1)' };
-  const short  = url.length > 60 ? url.slice(0, 57) + '…' : url;
+  const domain      = parseDomain(url);
+  const name        = domainToSourceName(domain);
+  const pill        = SOURCE_PILL[name] ?? { color: 'var(--gold)', bg: 'rgba(74,171,120,0.1)' };
+  const short       = url.length > 60 ? url.slice(0, 57) + '…' : url;
+  const typedName   = useTypewriter(name, 25, 0);
+  const typedUrl    = useTypewriter(short, 18, name.length * 25 + 80);
 
   return (
     <a
@@ -517,13 +603,16 @@ function SourceCard({ url }: { url: string }) {
       {/* Source name row */}
       <div className="flex items-center justify-between gap-2">
         <div className="flex items-center gap-2 min-w-0">
-          {/* Name in font-display — matches assistant message headings */}
+          {/* Name in font-display — typewriter reveal */}
           <span
             style={{ fontFamily: 'var(--font-display)', fontSize: '1rem', fontWeight: 500, color: 'var(--gold)', lineHeight: 1.2 }}
           >
-            {name}
+            {typedName}
+            {typedName.length < name.length && (
+              <span className="animate-pulse" style={{ color: 'var(--gold)', fontFamily: 'var(--font-mono)' }}>|</span>
+            )}
           </span>
-          {/* Source pill — matches MessageList style */}
+          {/* Source pill */}
           <span
             className="px-2 py-0.5 rounded-full text-xs shrink-0"
             style={{ fontFamily: 'var(--font-mono)', fontSize: '0.5625rem', backgroundColor: pill.bg, border: `1px solid ${pill.color}40`, color: pill.color }}
@@ -538,14 +627,17 @@ function SourceCard({ url }: { url: string }) {
         />
       </div>
 
-      {/* Divider — same as message card internal dividers */}
+      {/* Divider */}
       <div style={{ borderTop: '1px solid var(--border)' }} />
 
-      {/* URL */}
+      {/* URL — typewriter reveal after name finishes */}
       <p
         style={{ fontFamily: 'var(--font-mono)', fontSize: '0.5625rem', color: 'var(--text-secondary)', lineHeight: 1.55, wordBreak: 'break-all', opacity: 0.65 }}
       >
-        {short}
+        {typedUrl}
+        {typedUrl.length < short.length && typedName.length >= name.length && (
+          <span className="animate-pulse" style={{ color: 'var(--text-secondary)', fontFamily: 'var(--font-mono)' }}>|</span>
+        )}
       </p>
     </a>
   );

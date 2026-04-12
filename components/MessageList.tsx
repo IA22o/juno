@@ -1,7 +1,7 @@
 'use client';
 
 import ReactMarkdown from 'react-markdown';
-import { useEffect, useMemo, useRef, memo } from 'react';
+import { useEffect, useMemo, useRef, useState, memo } from 'react';
 import CitationBadge from './CitationBadge';
 
 /* ---------------------------------------------------------------
@@ -116,6 +116,32 @@ const UserMessage = memo(function UserMessage({ message }: { message: Message })
   );
 });
 
+function AssistantContent({ content }: { content: string }) {
+  const [visible, setVisible] = useState(false);
+  useEffect(() => {
+    const t = setTimeout(() => setVisible(true), 50);
+    return () => clearTimeout(t);
+  }, []);
+  return (
+    <div
+      style={{
+        opacity: visible ? 1 : 0,
+        transition: 'opacity 0.25s ease',
+      }}
+    >
+      <ReactMarkdown
+        components={{
+          a: ({ href, children }) => (
+            <CitationBadge href={href ?? ''}>{children}</CitationBadge>
+          ),
+        }}
+      >
+        {content}
+      </ReactMarkdown>
+    </div>
+  );
+}
+
 const AssistantMessage = memo(function AssistantMessage({ message }: { message: Message }) {
   const sources = useMemo(() => detectSources(message.content), [message.content]);
 
@@ -132,15 +158,7 @@ const AssistantMessage = memo(function AssistantMessage({ message }: { message: 
         >
           {/* Markdown content */}
           <div className="legal-result">
-            <ReactMarkdown
-              components={{
-                a: ({ href, children }) => (
-                  <CitationBadge href={href ?? ''}>{children}</CitationBadge>
-                ),
-              }}
-            >
-              {message.content}
-            </ReactMarkdown>
+            <AssistantContent content={message.content} />
           </div>
 
           {/* Source pills */}

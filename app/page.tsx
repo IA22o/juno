@@ -215,6 +215,7 @@ export default function Page() {
       setLastQuery(trimmedText);
       setQuery('');
       setIsLoading(true);
+      setSourcesPanelOpen(true);
 
       // 2. POST to /api/search with history
       abortControllerRef.current = new AbortController();
@@ -265,7 +266,7 @@ export default function Page() {
         abortControllerRef.current = null;
       }
     },
-    [isLoading, apiHistory]
+    [isLoading, apiHistory, searchCount]
   );
 
   const handleSelectSuggestion = useCallback(
