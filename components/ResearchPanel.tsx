@@ -55,13 +55,15 @@ interface ResearchPanelProps {
   isLoading: boolean;
   sources:   string[];
   query:     string;
+  isOpen:    boolean;
+  onToggle:  () => void;
 }
 
 /* ================================================================== */
 /*  Main component                                                      */
 /* ================================================================== */
 
-export default function ResearchPanel({ isLoading, sources, query }: ResearchPanelProps) {
+export default function ResearchPanel({ isLoading, sources, query, isOpen, onToggle }: ResearchPanelProps) {
   const [activeTab,       setActiveTab]       = useState<'sources' | 'news'>('sources');
   const [browseIndex,     setBrowseIndex]     = useState(0);
   const [displayedUrl,    setDisplayedUrl]    = useState('');
@@ -150,9 +152,78 @@ export default function ResearchPanel({ isLoading, sources, query }: ResearchPan
 
   /* ---------------------------------------------------------------- */
   return (
+    <>
+      {/* Overlay for mobile */}
+      {isOpen && (
+        <div
+          className="fixed inset-0 z-30 lg:hidden bg-black/40"
+          onClick={onToggle}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* Toggle tab — always visible on right edge */}
+      <button
+        type="button"
+        onClick={onToggle}
+        aria-label={isOpen ? 'Cerrar fuentes' : 'Consultar fuentes'}
+        className="fixed z-50 flex flex-col items-center justify-center gap-1.5 transition-all duration-300"
+        style={{
+          right: isOpen ? 380 : 0,
+          top: '50%',
+          transform: 'translateY(-50%)',
+          width: 28,
+          paddingTop: 14,
+          paddingBottom: 14,
+          backgroundColor: 'var(--navy-light)',
+          border: '1px solid var(--border)',
+          borderRight: isOpen ? '1px solid var(--border)' : 'none',
+          borderRadius: isOpen ? '6px 0 0 6px' : '6px 0 0 6px',
+          color: 'var(--gold)',
+          cursor: 'pointer',
+        }}
+      >
+        <Scale size={12} style={{ color: 'var(--gold)' }} />
+        <span
+          style={{
+            fontFamily: 'var(--font-mono)',
+            fontSize: '0.45rem',
+            letterSpacing: '0.12em',
+            color: 'var(--text-secondary)',
+            writingMode: 'vertical-rl',
+            textOrientation: 'mixed',
+            transform: 'rotate(180deg)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          FUENTES
+        </span>
+        {sources.length > 0 && (
+          <span
+            className="rounded-full flex items-center justify-center"
+            style={{
+              width: 14,
+              height: 14,
+              fontSize: '0.45rem',
+              backgroundColor: 'rgba(74,171,120,0.2)',
+              color: 'var(--gold)',
+              fontFamily: 'var(--font-mono)',
+            }}
+          >
+            {sources.length}
+          </span>
+        )}
+      </button>
+
+      {/* Drawer panel */}
     <aside
-      className="hidden lg:flex flex-col shrink-0 h-full"
-      style={{ width: 380, backgroundColor: 'var(--navy)', borderLeft: '1px solid var(--border)' }}
+      className="fixed top-0 right-0 z-40 flex flex-col h-full transition-transform duration-300"
+      style={{
+        width: 380,
+        backgroundColor: 'var(--navy)',
+        borderLeft: '1px solid var(--border)',
+        transform: isOpen ? 'translateX(0)' : 'translateX(100%)',
+      }}
     >
       {/* ── Browser chrome ───────────────────────────────────────── */}
       <div
@@ -308,6 +379,7 @@ export default function ResearchPanel({ isLoading, sources, query }: ResearchPan
         )}
       </div>
     </aside>
+    </>
   );
 }
 

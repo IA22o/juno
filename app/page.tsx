@@ -149,6 +149,7 @@ export default function Page() {
   const [queryHistory, setQueryHistory] = useState<string[]>([]);
   const [lastSources, setLastSources] = useState<string[]>([]);
   const [lastQuery, setLastQuery] = useState('');
+  const [sourcesPanelOpen, setSourcesPanelOpen] = useState(false);
   const [searchCount, setSearchCount] = useState(0);
   const SESSION_LIMIT = 3;
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -481,12 +482,14 @@ export default function Page() {
           )}
         </div>
 
-        {/* ── Right column: research panel ──────────────────────── */}
+        {/* ── Right column: research panel (collapsible drawer) ─── */}
         {(hasMessages || isLoading) && (
           <ResearchPanel
             isLoading={isLoading}
             sources={lastSources}
             query={lastQuery}
+            isOpen={sourcesPanelOpen}
+            onToggle={() => setSourcesPanelOpen((v) => !v)}
           />
         )}
       </div>
